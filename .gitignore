@@ -216,3 +216,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Data
+data/raw/
+data/processed/
+data/images/
+data/cache/
+
+# Model outputs
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+
+# Generated results
+results/

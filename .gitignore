@@ -26,6 +26,9 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# VS Code
+.vscode/
+
 # PyInstaller
 #   Usually these files are written by a python script from a template
 #   before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -222,6 +225,10 @@ data/raw/
 data/processed/
 data/images/
 data/cache/
+
+# Large sample-level derived manifests
+data/manifests/bodmas_all_v0.csv
+data/manifests/bodmas_family_v0.csv
 
 # Model outputs
 checkpoints/

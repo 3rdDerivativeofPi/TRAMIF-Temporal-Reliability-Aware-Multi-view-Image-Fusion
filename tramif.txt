@@ -1,0 +1,261 @@
+Lightweight Malware Family Classification under Temporal Drift by Fusing Multiple Binary Image Views Based on Historical Reliability
+Conference Version — Research Direction 1
+Prospective research framework · Adapted to the supplied LNCS planning document · 16 September 2026
+Abstract
+Binary visualization offers a compact route from executable bytes to malware-family predictions. Its usefulness after deployment, however, depends on whether the information captured by each image representation remains discriminative as malware and collection conditions change. This proposal extends short-bit-sequence visualization with raw-byte and local-entropy images, then asks whether historical evidence can identify which views will remain useful on later samples.
+The proposed method combines calibrated class probabilities from three small convolutional networks. Its fusion weights depend on held-out historical predictive quality, family-conditioned representation drift and uncertainty in the quality estimate. Drift is measured with fixed encoders and normalized against matched null comparisons. An optional cross-time supervised contrastive objective is evaluated separately. The primary experiment freezes all model components before testing on later months; it therefore measures temporal generalization without access to future labels or future batches for tuning.
+The main task is classification of later samples from families represented in training. Unknown-family rejection is an optional extension and does not imply naming a previously unseen family. The study will evaluate future macro F1, calibration, mechanism ablations and total byte-to-decision cost. Its central contribution would be evidence that historical reliability adds predictive value beyond recent accuracy and ordinary ensembling. All improvements, efficiency targets and anticipated findings below are hypotheses, not completed results.
+Keywords: malware-family classification; temporal drift; binary visualization; short-bit transitions; multi-view learning; historical reliability.
+1 Introduction
+1.1 Background
+A binary image maps executable content into a representation that an image classifier can process without executing the program. The supplied paper by Zhang et al. introduces MalCSBSV, using a Short Bit Sequence Markov Image (SBSMI) and the lightweight MalSBSLCNet classifier. Six-bit states yield a 64 × 64 transition image. The paper reports approximately 0.054 million classifier parameters and 9.22 million classifier FLOPs [1]. These figures exclude the cost of reading a file and constructing its image.
+1.2 The temporal generalization problem
+Later malware can differ from training data because of new variants, packing, compilation changes or collection practices. A random split can place closely related samples on both sides of an evaluation and conceal deterioration over time. The intended setting is chronological: train on earlier files, select the method using later historical validation, then predict genuinely future observations with a frozen model.
+1.3 The key observation and motivation
+Different views of the same bytes retain different information. A raw-byte image emphasizes coarse layout; entropy describes local regularity; SBSMI summarizes short-state transitions. Their usefulness may change at different rates. Combining them is valuable only if the weighting mechanism can distinguish a stable, informative view from a stable but uninformative one, and if any gain justifies the extra cost.
+1.4 Research gap
+Temporal evaluation, drift adaptation and multi-view malware learning already have substantial prior work [2–4]. The proposed gap is narrower: whether a compact, historically estimated reliability rule predicts the future usefulness of binary image views after controlling for recent quality, class composition and model capacity. Low drift alone is not evidence of low future error.
+1.5 Research questions
+RQ1 — View stability. Do the three views exhibit different within-family drift after sample-size and family-mixture controls?
+RQ2 — Predictive value. Does historical drift improve prediction of next-period error beyond recent predictive quality?
+RQ3 — Fusion. Does reliability-based fusion improve frozen future performance over strong, cost-matched alternatives?
+RQ4 — Temporal learning. Does cross-time contrastive training help without reducing class separation or minority-family recall?
+RQ5 — Practicality. What accuracy, calibration and end-to-end cost trade-offs remain across later months and file sizes?
+1.6 Proposed contributions
+The intended contributions are a temporal audit of compact binary image views; a small quality–drift–uncertainty fusion rule; a controlled evaluation of optional temporal contrastive training; and a reproducible chronological protocol with efficiency measurements. The method must outperform quality-only weighting to support the specific value of the drift term. A rigorous negative result would also clarify the limits of stability-based fusion.
+2 Related Work
+2.1 Binary visualization for malware analysis
+MalCSBSV provides the direct representation and lightweight baseline [1]. This proposal preserves its bitstream-to-image idea while comparing complementary views. The supplied source method is SBSMI plus MalSBSLCNet; the raw-byte and entropy branches below are proposed additions. The source paper’s scores are not treated as measurements on the proposed temporal split.
+2.2 Multi-view malware representation
+Recent work includes self-supervised multi-view contrastive representations for malware evolution forecasting [4]. Accordingly, the proposal does not claim that multiple views or contrastive learning are new by themselves. It isolates whether a lightweight historical reliability estimate improves subsequent classification at a matched resource budget.
+2.3 Temporal malware evolution
+TESSERACT identifies temporal and spatial biases in malware evaluation and motivates realistic chronological comparisons [2]. Here, within-family feature change, changing family proportions and the appearance of unseen families are treated as distinct phenomena. Aggregate distribution change can otherwise be mistaken for a deterioration in every view.
+2.4 Temporal adaptation
+Li et al. study adaptation to drifted Windows malware using control-flow graphs and limited new labels [3]. That setting informs a later extension, but its access to adaptation data differs from the primary frozen-model experiment here. Adaptation baselines must receive the same delayed labels and target data as the proposed adaptation method.
+2.5 Research positioning
+The candidate novelty is historical reliability estimation for compact binary image fusion, supported by held-forward prediction tests and mechanism ablations. Supervised contrastive learning [8] and MMD [9] are established components. The final submission should update the literature review and narrow any novelty claim to what the experiments actually establish.
+3 Problem Formulation
+3.1 Malware sample and prediction target
+Each observation consists of file bytes x, a family label y, an observation time t and a file hash. Let K be the eligible family set selected using training data only. The primary classifier predicts a member of K for later malware with a label in K. Family classification alone does not establish benign-versus-malicious detection performance.
+3.2 Multi-view representation
+For each view v, a deterministic transform produces an image, a compact encoder produces an embedding, and a head returns probabilities over the same ordered family set:
+Iv(x) = gv(x),   zv(x) = fv(Iv(x)),   pv(y | x)
+The three views share the source file and label set, but need not share latent coordinates. Fusion therefore operates on calibrated probabilities rather than averaging unaligned embeddings.
+3.3 Temporal evaluation and open-set scope
+Training precedes validation, and validation precedes every future test month. A shift in the conditional distribution within a known family differs from a shift in family frequency. A later sample whose family is outside K is outside the main classification task; its prevalence must still be disclosed. Optional rejection labels it unknown relative to training, not as a newly discovered global family or a confirmed zero-day threat.
+3.4 Temporal Generalization Gap
+As a secondary diagnostic, define the gap between a documented random-split score and a chronological score on comparable eligible cohorts:
+TGG = F1random − F1future
+Report both component scores. A small gap can reflect two poor models, and differences in cohort composition can affect the gap. The primary objectives remain absolute future performance and worst-month performance.
+4 Multi-View Binary Image Construction
+4.1 Raw-byte image
+Arrange bytes in rows of width 256, preserving offset order, and map byte values to intensities. Keep a validity mask for the final partial row. Use deterministic, mask-aware area resizing to obtain a 64 × 64 image; padding must not contribute to area averages. This view captures coarse layout but loses detail through resizing. Evaluate alternative row widths as a representation sensitivity test.
+4.2 Entropy image
+Compute Shannon entropy in 256-byte windows with stride 128, using only valid bytes. Normalize by eight bits and assign overlapping window estimates to their covered offsets by averaging. Map those values onto the raw-byte layout and resize with the same validity mask:
+H(W) = −b = 0,…,255pb(W) log2 pb(W),   Ientropy ∝ H(W) / 8
+Use zero for terms with zero probability. Document how files shorter than one window and trailing partial windows are handled. Entropy describes byte regularity; it is not a ground-truth label for packing or maliciousness.
+4.3 Short Bit Sequence Markov Image
+Split the bitstream into non-overlapping six-bit states and count adjacent transitions. Reproduce the source paper’s bit order and incomplete-block convention before testing alternatives. For each state a with at least one outgoing transition:
+Pab(x) = Nab(x)j = 0,…,63Naj(x),   ISBSMI(a,b) = ⌊255Pab(x)⌋
+Rows without outgoing transitions are zero. The result is 64 × 64 regardless of file length, although construction still scans the input. The main experiment uses source-compatible integer quantization; an ablation uses floating-point transition probabilities.
+4.4 Implementation controls
+Version the bit order, tail handling, resize operator, quantization and masking rules. Scale all inputs to [0, 1] using their fixed value ranges and apply identical preprocessing to training and future data. Avoid natural-image flips or rotations unless their meaning is justified for the representation. A fixed permutation of SBSMI state indices, used consistently during training and testing, tests sensitivity to arbitrary image adjacency.
+4.5 View organization
+Table 1. Information retained by each proposed view.
+View
+Fixed input
+Main information
+Main limitation
+Raw bytes
+64 × 64
+Coarse byte layout and intensity
+Lossy resizing; width artifacts
+Entropy
+64 × 64
+Local regularity across file offsets
+Compression is not family identity
+SBSMI
+64 × 64
+Adjacent short-state transitions
+Most long-range order is discarded
+
+
+The core pipeline requires no execution, unpacking or disassembly. Opcode-based views are outside the initial study because they add parsing failures and costs that would need a separate analysis.
+5 Temporal Stability Analysis
+5.1 Temporal windows
+Use monthly windows when support permits. Match family-specific sample counts between compared windows, and report the families excluded for insufficient observations. Fix support rules before the future test. Historical forward episodes provide development evidence; future drift measurements are post-test diagnostics and never update the frozen model.
+5.2 Channel-wise representation distributions
+Extract embeddings with the same frozen encoder and historical normalization on both sides of each comparison. Do not compare latent coordinates from independently retrained networks. During development, each forward episode fits its own encoder using only the period available before that episode’s evaluation block.
+5.3 MMD-based drift
+Measure distribution discrepancy using the squared distance between empirical kernel mean embeddings, a nonnegative biased MMD estimator [9]. For two sets of fixed-view embeddings Z and Z′:
+MMD2(Z,Z′) = ‖1ni = 1,…,nφ(zi) − 1mj = 1,…,mφ(zj′)‖2
+Use an RBF kernel with bandwidth fixed from training embeddings. Control the per-family sample cap to bound cost. This estimator can be positive even under finite-sample null comparisons, so raw scores should not be compared across views without calibration.
+5.4 Family-conditioned drift
+Compute MMD separately for each adequately supported family shared by the two windows, then average families equally. Also report marginal drift to expose changes in the family mixture. Standardize the conditional score against repeated same-period splits matched for family support and sample counts:
+D̃v = max(0, Dv,cond − v,nullv,null + ε)
+The null mean, null standard deviation and small positive numerical constant must be specified from historical data. Report resampling uncertainty and the number of supported families; a low score with little data is not strong evidence of stability.
+6 Temporal Stability and Reliability
+6.1 Stability score
+For an interpretable descriptive score, map standardized drift to a value between zero and one:
+Sv = 11 + D̃v
+This score measures distributional stability under the chosen representation and comparison. It does not measure classification accuracy.
+6.2 Reliability components
+Let Q be negative class-balanced log loss on held-out historical observations, so larger values indicate better quality. Let U be the bootstrap standard error of that quality estimate, resampling file or near-duplicate groups. Use standardized drift D̃ as the third component. Where support is inadequate, mark the estimate unavailable and use a prespecified quality-only fallback rather than substituting zero drift.
+6.3 Interpretation
+A view with high stability but poor quality can be uninformative. A changing view may remain discriminative. Uncertainty can also differ because some families have few samples. The weighting mechanism should therefore be evaluated as a predictive rule whose usefulness must be demonstrated, not as an automatic consequence of stability.
+7 Temporal-Reliability-Aware Fusion
+Use a small, global rule to avoid overfitting the limited historical timeline. With nonnegative coefficients a, b and c, define a score and normalize it across the three views:
+rv = aQv − bD̃v − cUv,   wv = exp(rv)u = 1,2,3exp(ru)
+p(y | x) = v = 1,2,3wv pv(y | x)
+Calibrate each head by temperature scaling on historical validation and keep the same class order in every branch. Select coefficients through forward historical episodes using a small preregistered grid, including uniform and quality-only choices. Do not fit a large gating network and attribute its gains to this three-coefficient rule.
+Fit final encoders on the designated training period. Reserve February for historical temperature and reliability estimation and March for final forward selection, subject to the support audit; cross-fitting within the earlier development period can reduce reuse. After the rule is selected, compute its final historical statistics using the documented pre-April windows. Freeze encoders, batch-normalization statistics, calibration and weights before April. No future labels or unlabeled test batches enter this process.
+The primary model uses one frozen weight vector, not monthly test-driven adaptation. Compare against uniform probability averaging, static weights learned on the same historical data, content-based gating and quality-only weighting. Any later weight updates belong to the separate adaptation extension.
+8 Temporal Consistency Learning
+As an optional addition, train each view with class cross-entropy and a supervised contrastive term [8]:
+L = v = 1,2,3[LCE,v + λLSupCon,v]
+Construct batches containing different files from the same family in different training months. Use same-family examples as positives and different-family examples as negatives, prioritizing cross-month positives. These pairs share a family label; they are not assumed to be direct evolutionary parent–child pairs. Keep the contrastive projection head separate from the class head and discard it at inference if it is not needed.
+Tune the contrastive temperature, sampling policy and loss weight using historical validation. Retain cross-entropy-only training as the main control. Monitor effective embedding rank, class separation and minority-family recall: forcing every same-family file toward one point can erase useful substructure or produce collapse.
+9 Model Architecture
+Three compact CNN branches process the images independently and produce probabilities for the same known families. Start from source-compatible SBSMI classification, then allocate the other branch widths within the overall budget. Parameter counts depend on the number of eligible families and must include all retained heads.
+
+Figure 1. Historical development determines the temperatures and view weights. Future inference uses only the incoming file and frozen components.
+A provisional engineering target is at most 0.3 million trainable inference parameters. This is a design target, not a measured result or a guarantee that the original classifier’s FLOPs are preserved. Compare both parameter-matched and measured-latency alternatives; preprocessing can dominate the cost for large binaries.
+10 Theoretical Analysis
+10.1 Proposition 1 — Stability monotonicity
+For nonnegative standardized drift, the descriptive stability score decreases monotonically:
+∂Sv∂D̃v = −1(1 + D̃v)2 < 0
+This follows directly by differentiation. It establishes the score’s direction, not a relationship between stability and future classification risk.
+10.2 Proposition 2 — Effect of the drift penalty
+Holding quality, uncertainty and the other views’ scores fixed, the proposed softmax rule satisfies:
+∂wv∂D̃v = −bwv(1 − wv) ≤ 0
+Thus, increasing a view’s drift estimate cannot increase its own weight when b is nonnegative. This is a design property, not proof that the resulting weights are statistically optimal. Errors from views of the same file may be strongly correlated.
+10.3 Proposition 3 — A probability-mixture bound
+Nonnegative weights summing to one preserve a valid probability distribution. For positive probabilities, convexity of negative log gives a pointwise bound:
+−log(vwv pv(y | x)) ≤ vwv [−log pv(y | x)]
+The mixture’s log loss is at most the weighted average component log loss on that observation. This does not guarantee superiority to the best component, better macro F1, or resistance to future drift. The central reliability hypothesis therefore requires experiments; no inverse-variance optimality or universal temporal-generalization guarantee is claimed.
+11 Experimental Design
+11.1 Dataset strategy and access
+Table 2. Specific datasets and feasibility conditions. Official access pages checked on 16 September 2026.
+Dataset and scale
+Access terms
+Role and limitation
+BODMAS — Blue Hexagon Open Dataset for Malware AnalysiS [5].
+57,293 malware files; 581 families; Aug 2019–Sep 2020. Also 77,142 benign feature records. Public features ≈250 MB; metadata ≈12 MB.
+Features and metadata are public. Raw malware requires researcher approval; the published terms prohibit sharing outside project coauthors. Benign binaries are not released.
+Primary known-family temporal study, conditional on binary access. Feature vectors alone cannot reconstruct the images.
+SOREL-20M [6,7].
+About 20 million records and 9.92 million disarmed malware binaries; full release roughly 8 TB.
+Public S3 access without credentials, subject to dataset Terms of Use. The repository’s Apache 2.0 code license is distinct from the data terms.
+Open fallback for a bounded temporal study using behavior tags. These tags are not curated family labels; the task would change to multilabel classification.
+
+
+Direct official links and terms are provided in References [5–7]. Availability checks confirm the advertised access routes, not a completed bulk download or a permission grant. Start with a manifest and storage audit. If primary binary access fails, explicitly reframe the SOREL study, keep files disarmed and audit modified-header artifacts; do not present it as an equivalent family-classification replication.
+11.2 Chronological splitting
+Table 3. Proposed BODMAS chronology, to be confirmed by the support audit before test access.
+Period
+Proposed dates
+Allowed use
+Training
+Aug 2019–Jan 2020
+Fit representations, encoders and historical development episodes.
+Validation
+Feb–Mar 2020
+Estimate historical reliability; calibrate; select the final rule and hyperparameters.
+Future test
+Apr–Sep 2020
+Six untouched monthly evaluations with all components frozen.
+
+
+Use observed timestamps rather than PE compilation timestamps. Select eligible families from training only; an initial support rule is at least 50 unique files across at least three training months. Publish actual retained counts and the later proportions belonging to unseen or excluded families. Labels may have been assigned retrospectively, so historical label availability is a stated limitation unless independently documented.
+Remove exact duplicates and use a conservative, training-specified near-duplicate grouping policy. Keep all views of one file together. Remove later repeated copies from evaluation instead of moving future files into training. Report sensitivity to grouping strength, since aggressive similarity filtering can remove real evolution. Fit normalization, bandwidths, support rules and thresholds using historical data only.
+11.3 Baselines
+Include reproduced MalCSBSV; raw-byte and entropy CNNs; a multilayer perceptron on the same SBSMI values; a one-dimensional byte model; and gradient-boosted trees on permitted PE features for the identical malware cohort. Compare uniform fusion, static learned fusion, content-based gating, quality-only, drift-only and full reliability weighting. Give all methods equivalent tuning effort and disclose preprocessing failures. Any baseline using future batches or labels belongs in the separate adaptation experiment.
+11.4 Evaluation metrics and inference
+Primary outcomes are mean monthly macro F1 and worst-month macro F1 over the six future months. For each month, average F1 over eligible families with observed true support and publish that support set; predictions into unsupported labels still generate false negatives for their true families. Also report pooled F1 over the fixed eligible set, marking recall undefined where no true examples exist. This makes changes in monthly class support visible.
+Report per-family recall, balanced accuracy, negative log loss, multiclass Brier score and calibration error with fixed, documented bins. Plot performance at one-, three- and six-month horizons. Use five training seeds and paired group-bootstrap 95% intervals for method differences, with family and temporal-block sensitivity analyses. Seeds are repeated fits, not new malware populations; six months limit temporal inference. Predeclare a practical target such as a two-percentage-point macro-F1 gain, without presenting it as an expected measured result.
+12 Research Questions and Experiments
+12.1 RQ1 — Channel-level drift audit
+Measure each view’s marginal and family-conditioned drift across historical windows. Repeat with balanced family counts, matched sample sizes and controlled timestamp permutations. Report uncertainty, null distributions and support. Determine whether apparent stability differences survive composition controls instead of relying on a single aggregate drift plot.
+12.2 RQ2 — Stability and subsequent performance
+Predict next-window per-view log loss from recent quality alone, then add historical drift and uncertainty. Fit and select this small predictor only on earlier forward episodes and score it on held-forward windows. Adjust for family proportions, file sizes and available packing indicators. Report improvement in predictive error, not just an in-sample correlation; the small number of windows limits model complexity and causal interpretation.
+12.3 RQ3 — Frozen reliability fusion
+Compare the full rule with the strongest preregistered single-view and fusion baselines on untouched future months. The decisive comparison is full reliability versus quality-only weighting under the same capacity and access conditions. Report mean and worst-month performance, paired differences, calibration and family-specific failures. Test outcomes must not be used to choose a new preferred coefficient set.
+12.4 RQ4 — Cross-time contrastive learning
+Use a factorial comparison of fusion choice and contrastive training: uniform versus reliability fusion, each with and without the temporal term. Match optimization effort. Compare cross-month positive sampling with ordinary same-family sampling, and inspect class separation, effective rank and minority recall. This separates gains from representation training from gains due to the fusion rule.
+12.5 RQ5 — Efficiency and limited-update extensions
+Measure file reading, image construction and inference separately and together. Report CPU and GPU latency, throughput, peak memory, FLOPs, model size and file-size buckets with hardware and batch settings. A fixed-size image does not make preprocessing constant time: constructing these views remains linear in input length.
+For an optional update study, predict each arriving month before incorporating delayed labels. Specify the delay and compare equal budgets, such as 10 or 50 new labels per eligible family, against recalibration and retraining. Report these results separately from the frozen test. For optional unknown-family rejection, set thresholds using historical validation or held-out historical families and report unknown recall, false rejection of known families and risk–coverage curves. Rejection cannot name an unseen family.
+13 Ablation Study
+Table 4. Ablations that isolate the proposed mechanism.
+Ablation
+Controlled comparison
+Question resolved
+Reliability terms
+Uniform; quality only; quality + drift; quality + uncertainty; full rule
+Does drift add value beyond recent quality?
+View removal
+Drop each branch with matched total capacity
+Which information contributes beyond model size?
+Drift definition
+Marginal vs conditional; raw vs null-standardized
+Are gains driven by mixture or scale artifacts?
+Reliability shuffle
+Permute view scores using a prespecified historical control
+Does the meaning of the scores matter?
+Image construction
+Quantization, row width, state-index permutation, MLP control
+Does image geometry create accidental advantages?
+Temporal objective
+Cross-entropy alone vs cross-time contrastive training
+Is temporal regularization useful and non-collapsing?
+Support and grouping
+Family thresholds and near-duplicate policies
+Do conclusions depend on one cohort definition?
+
+
+Set the ablation menu before the final test and label exploratory follow-ups. Report all prespecified comparisons, including failures, without selecting only favorable months or families.
+14 Expected Findings
+H1: views differ in future reliability after accounting for recent discrimination and class composition. H2: quality-plus-drift weighting improves future macro F1 over quality-only fusion at comparable cost. H3: cross-time contrastive training improves retention without erasing family structure. These are falsifiable hypotheses; none is asserted as an experimental result.
+A credible alternative outcome is that recent quality explains nearly all useful variation and drift adds noise. Another is that the most reliable single view matches the ensemble after latency is controlled. Either result would constrain the proposed mechanism and should lead to a simpler recommendation, rather than an unsupported claim of temporal robustness.
+15 Discussion
+15.1 Scientific and operational meaning
+The work tests whether evidence available before deployment helps choose useful views afterward. Even a positive result would apply to the measured cohort and time horizon. The model may still fail under new packers, collection changes or unseen families. Historical corpora cannot establish performance against malware circulating in 2026.
+15.2 Feasibility and execution plan
+Begin with access, timestamp and support audits. Reproduce SBSMI and the baseline, then construct the other views and lock chronological splits. Next develop the reliability rule using historical episodes, freeze the protocol, and run future evaluation and ablations. A single 12–24 GB GPU and 32–64 GB host memory are provisional planning assumptions, subject to profiling. A SOREL subset requires an explicit sampling and storage plan.
+15.3 Reproducibility
+Release preprocessing specifications, code, environment versions, seeds, permitted hash manifests and aggregate results. Record exclusions, failed files and final resource costs. Do not redistribute binaries contrary to dataset terms. Preserve a dated protocol so that post-test changes are distinguishable from planned analyses.
+16 Threats to Validity
+Temporal and label validity. Observation time is not creation time, and retrospective family labels may reveal knowledge unavailable historically. Document timestamp semantics and label provenance.
+Selection and access bias. Approved binaries and eligible families may be an unrepresentative subset. Report exclusions and unknown-family prevalence; the SOREL fallback changes the prediction task.
+Measurement validity. MMD depends on the encoder, kernel and support. Conditional averaging can hide rare-family changes. Report both aggregate and family-level evidence with uncertainty.
+Confounding and leakage. Duplicate variants, family mixture, file size and collection source can explain apparent gains. Use chronological controls and grouped comparisons; future diagnostics must not influence frozen weights.
+Model and statistical validity. Additional branches increase capacity and multiple comparisons increase selection risk. Match budgets, preregister primary contrasts and avoid treating repeated seeds as independent temporal evidence.
+External validity. Two historical sources, short horizons and static byte evidence cannot establish universal robustness, benign-file detection, or resistance to adaptive attacks. State the tested scope precisely.
+17 Conclusion
+This proposal extends the source bitstream-to-image method into a controlled study of temporal malware-family classification. Its central question is whether historical quality, drift and uncertainty can improve the selection and fusion of compact binary image views for future known-family samples. The design separates temporal generalization, optional adaptation and unknown-family rejection, and tests the reliability mechanism against quality-only and cost-matched alternatives. The final conclusion will depend on those measurements, including negative findings.
+18 Recommended Paper Figures
+Figure 1 — Method architecture. Historical estimation, frozen components and the three probability-producing branches; included above.
+Figure 2 — Chronology and cohort. Training, validation and future windows with retained counts and unknown-family proportions.
+Figure 3 — View examples. The three images from the same permitted samples, with consistent preprocessing annotations.
+Figure 4 — Drift audit. Marginal and conditional drift by view, with null ranges and support.
+Figure 5 — Predictive reliability. Held-forward predicted versus observed next-period loss and incremental value beyond quality.
+Figure 6 — Future performance. Monthly macro F1 and paired uncertainty for the main baselines.
+Figure 7 — Mechanism ablations. Quality-only versus full weighting, view removal and temporal training effects.
+Figure 8 — Cost and calibration. Byte-to-decision latency by size, accuracy–cost trade-offs and reliability diagrams.
+Figures 2–8 are planned outputs to be generated from measured data. No synthetic values should be presented as completed experimental results.
+19 Recommended Conference Title Alternatives
+Recommended full title: Lightweight Malware Family Classification under Temporal Drift by Fusing Multiple Binary Image Views Based on Historical Reliability.
+This title states the efficiency aim, family-classification task, temporal setting, multi-view binary representation and historical weighting mechanism. It does not claim that unknown families can be named or that temporal stability has already been demonstrated.
+Concise alternative: Historical Reliability-Based Fusion of Multiple Binary Image Views for Lightweight Malware Family Classification under Temporal Drift.
+Evaluation-focused alternative: Evaluating Temporal Generalization of Lightweight Malware Family Classifiers with Historical Reliability-Based Multi-View Binary Image Fusion.
+References
+[1] Zhang, J., Guo, C., Shen, G., Ping, Y., Cui, Y., Chen, Y. A lightweight malware classification method based on short bit sequence visualization. Engineering Applications of Artificial Intelligence 181, 115559 (2026). Supplied source paper. Publisher DOI
+[2] Pendlebury, F., Pierazzi, F., Jordaney, R., Kinder, J., Cavallaro, L. TESSERACT: Eliminating Experimental Bias in Malware Classification across Space and Time. USENIX Security, pp. 729–746 (2019). Official paper page
+[3] Li, A. S., Iyengar, A., Kundu, A., Bertino, E. Revisiting Concept Drift in Windows Malware Detection: Adaptation to Real Drifted Malware with Minimal Samples. NDSS (2025). Official paper
+[4] Banga et al. Proactive zero-day malware evolution forecasting via self-supervised multi-view contrastive representation learning and hybrid generative modeling. Discover Computing (2026). Publisher article
+[5] Yang et al. BODMAS: Blue Hexagon Open Dataset for Malware AnalysiS. Official dataset description, public downloads and restricted binary-access conditions. Access route checked 16 September 2026. Dataset and access instructions
+[6] Harang, R., Rudd, E. M. SOREL-20M: A Large Scale Benchmark Dataset for Malicious PE Detection. arXiv:2012.07634 (2020). Dataset paper
+[7] Sophos. SOREL-20M official repository, public S3 instructions and dataset Terms of Use. Access route checked 16 September 2026. Repository and terms
+[8] Khosla et al. Supervised Contrastive Learning. Advances in Neural Information Processing Systems 33 (2020). Official paper
+[9] Gretton, A., Borgwardt, K. M., Rasch, M. J., Schölkopf, B., Smola, A. A Kernel Two-Sample Test. Journal of Machine Learning Research 13(25), 723–773 (2012). Official article
+Document basis: Research Direction 1 in the supplied Word proposal, following the supplied PDF’s research-framework structure. This is a planning document, not an official Springer submission template.

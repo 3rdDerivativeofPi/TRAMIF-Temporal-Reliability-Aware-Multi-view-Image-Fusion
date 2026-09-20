@@ -1,0 +1,37 @@
+version: v1
+
+output:
+  height: 64
+  width: 64
+
+raw_byte:
+  row_width: 256
+  value_range: [0, 255]
+  normalization: divide_by_255
+  padding_value: 0
+  padding_contributes_to_resize: false
+  resize_operator: pytorch_area
+  empty_file: error
+
+entropy:
+  row_width: 256
+  window_size: 256
+  stride: 128
+  normalization_bits: 8
+  overlap_combination: mean
+  short_file_policy: single_partial_window
+  trailing_policy: single_partial_window_at_next_stride
+  padding_value: 0
+  padding_contributes_to_resize: false
+  resize_operator: pytorch_area
+  empty_file: error
+
+sbsmi:
+  state_bits: 6
+  output_height: 64
+  output_width: 64
+
+  # Pending verification against Zhang et al.
+  bit_order: null
+  incomplete_block_handling: null
+  quantization: null

@@ -31,7 +31,11 @@ sbsmi:
   output_height: 64
   output_width: 64
 
-  # Pending verification against Zhang et al.
-  bit_order: null
-  incomplete_block_handling: null
-  quantization: null
+  segmentation: non_overlapping
+  transition_direction: previous_to_current
+  normalization: row_l1
+  intensity_scale: 255
+
+  bit_order: pending_source_verification
+  incomplete_block_handling: pending_source_verification
+  quantization: pending_source_verification

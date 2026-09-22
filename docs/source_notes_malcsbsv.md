@@ -135,3 +135,36 @@ The current implementation uses MSB-first as a development assumption.
 Do not mark SBSMI fully source-compatible until the bit-order convention
 has been independently verified or explicitly retained as an unresolved
 implementation assumption.
+
+## MalSBSLCNet architecture
+
+Figure 4 specifies an initial 3 × 3 convolution producing 16 channels,
+followed by BatchNorm and ReLU.
+
+The feature extractor then contains six BaseBlocks:
+
+| Block | Stride | Input channels | Output channels |
+| --- | ---: | ---: | ---: |
+| 1 | 2 | 16 | 32 |
+| 2 | 1 | 32 | 32 |
+| 3 | 2 | 32 | 64 |
+| 4 | 1 | 64 | 64 |
+| 5 | 2 | 64 | 128 |
+| 6 | 1 | 128 | 128 |
+
+The stride-1 BaseBlock splits the channels into two branches. One branch is
+retained while the other applies pointwise convolution, depthwise convolution,
+and a second pointwise convolution. The two branches are concatenated and
+channel shuffled.
+
+The stride-2 BaseBlock uses two transformed branches. One branch performs
+depthwise downsampling followed by pointwise convolution. The other performs
+pointwise convolution, depthwise downsampling, and a second pointwise
+convolution. Their outputs are concatenated and channel shuffled.
+
+The classifier is specified as:
+
+AdaptiveAvgPool -> Flatten -> BatchNorm -> Dropout(0.4) -> Linear.
+
+The exact AdaptiveAvgPool output size should be verified from Appendix A before
+claiming exact source compatibility.

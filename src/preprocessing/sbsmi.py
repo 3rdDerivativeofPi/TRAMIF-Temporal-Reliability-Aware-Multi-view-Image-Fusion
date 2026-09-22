@@ -32,25 +32,12 @@ def bits_to_states(
     """
     Split a bitstream into non-overlapping l-bit states.
 
-    Current tail policy:
-    discard an incomplete final state.
-
-    This matches the likely interpretation of ReadBits(..., l) returning
-    EOF when a complete state cannot be read, but must remain documented
-    until the source semantics are verified.
+    If the final state contains fewer than l bits,
+    the missing higher-order bits are treated as zero.
     """
 
     n_complete = len(bits) // state_bits
-
-    if n_complete == 0:
-        return np.empty(0, dtype=np.uint8)
-
-    usable = bits[: n_complete * state_bits]
-
-    chunks = usable.reshape(
-        n_complete,
-        state_bits,
-    )
+    n_tail = len(bits) % state_bits
 
     powers = 2 ** np.arange(
         state_bits - 1,
@@ -59,9 +46,42 @@ def bits_to_states(
         dtype=np.uint64,
     )
 
-    states = chunks @ powers
+    states = []
 
-    return states.astype(np.uint8)
+    if n_complete > 0:
+        usable = bits[: n_complete * state_bits]
+
+        chunks = usable.reshape(
+            n_complete,
+            state_bits,
+        )
+
+        complete_states = chunks @ powers
+
+        states.extend(
+            complete_states.tolist()
+        )
+
+    if n_tail > 0:
+        tail = bits[n_complete * state_bits:]
+
+        padded_tail = np.zeros(
+            state_bits,
+            dtype=np.uint8,
+        )
+
+        padded_tail[-n_tail:] = tail
+
+        tail_state = padded_tail @ powers
+
+        states.append(
+            int(tail_state)
+        )
+
+    return np.array(
+        states,
+        dtype=np.uint8,
+    )
 
 def transition_counts(
     states: np.ndarray,
@@ -129,10 +149,4 @@ def sbsmi_float(
 def quantize_sbsmi(
     image: np.ndarray,
 ) -> np.ndarray:
-    """
-    Pending exact source-compatible MatrixConvImage semantics.
-    Not sure if the source doesnt tell us if it should be quantized to 8-bit or rounding first and then quantized to 8-bit. The pseudocode is not clear on this.
-    """
-    raise NotImplementedError(
-        "Source quantization convention not yet verified"
-    )
+    return np.floor(image).astype(np.uint8)

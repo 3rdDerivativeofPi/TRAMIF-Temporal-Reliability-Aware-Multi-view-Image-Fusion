@@ -37,5 +37,5 @@ sbsmi:
   intensity_scale: 255
 
   bit_order: pending_source_verification
-  incomplete_block_handling: pending_source_verification
-  quantization: pending_source_verification
+  incomplete_block_handling: zero_fill_missing_high_order_bits
+  quantization: floor_probability_times_255_to_uint8

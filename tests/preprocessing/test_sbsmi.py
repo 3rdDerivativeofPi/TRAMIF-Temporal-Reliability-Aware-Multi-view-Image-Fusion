@@ -2,6 +2,7 @@ import numpy as np
 
 from src.preprocessing.sbsmi import (
     bits_to_states,
+    quantize_sbsmi,
     row_normalize,
     transition_counts,
 )
@@ -80,12 +81,12 @@ def test_row_normalization_with_multiple_targets():
         1 / 3,
     )
 
-def test_incomplete_state_is_discarded():
+def test_incomplete_state_zero_fills_missing_high_order_bits():
 
     bits = np.array(
         [
             0, 0, 0, 0, 0, 1,  # complete state = 1
-            1, 1, 1,             # incomplete tail
+            1, 1, 1,             # incomplete tail -> 000111 = 7
         ],
         dtype=np.uint8,
     )
@@ -94,10 +95,35 @@ def test_incomplete_state_is_discarded():
 
     np.testing.assert_array_equal(
         states,
-        np.array([1]),
+        np.array([1, 7]),
     )
 
 # Current source interpretation:
 # incomplete final l-bit block is discarded.
 #
-# Must be revisited if ReadBits semantics in the source indicate otherwise.
+
+
+
+def test_quantize_sbsmi_uses_floor():
+
+    image = np.array(
+        [
+            [0.0, 127.5, 170.0, 255.0],
+        ],
+        dtype=np.float32,
+    )
+
+    quantized = quantize_sbsmi(image)
+
+    np.testing.assert_array_equal(
+        quantized,
+        np.array(
+            [
+                [0, 127, 170, 255],
+            ],
+            dtype=np.uint8,
+        ),
+    )
+
+    assert quantized.dtype == np.uint8
+    

@@ -1,0 +1,15 @@
+{
+  "metadata_rows": 134435,
+  "malware_rows": 57293,
+  "blank_family_rows": 77142,
+  "training_malware_rows": 20333,
+  "training_families": 395,
+  "eligible_training_families": 51,
+  "archive_members": 57293,
+  "archive_sha_filenames": 57293,
+  "meta_disarm_unique_sha": 57293,
+  "metadata_malware_unique_sha": 57293,
+  "metadata_missing_from_archive": 0,
+  "archive_missing_from_metadata": 0,
+  "archive_missing_from_meta_disarm": 0
+}

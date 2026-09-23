@@ -1,4 +1,4 @@
-family_clean,unique_files,training_months,eligible
+family,n_files,n_months,eligible_provisional
 wacatac,3311,6,True
 upatre,1791,6,True
 dinwod,1124,6,True

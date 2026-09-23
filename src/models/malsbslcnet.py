@@ -1,4 +1,3 @@
-import torch
 from torch import Tensor
 from torch import nn
 
@@ -13,13 +12,13 @@ from src.models.malsbslcnet_blocks import (
 
 class MalSBSLCNet(MalwareImageBranch):
     """
-    Lightweight CNN for 64x64 SBSMI inputs.
+    MalSBSLCNet architecture reproduced from Zhang et al.
 
-    Backbone structure follows Fig. 4 of Zhang et al.
+    The feature extractor and classifier structure follow Fig. 4
+    and Appendix A.
 
-    Note:
-    exact AdaptiveAvgPool output dimensions remain to be
-    verified against Appendix A.
+    The final output dimension is adapted to the project's
+    training-derived family label space.
     """
 
     def __init__(
@@ -31,6 +30,7 @@ class MalSBSLCNet(MalwareImageBranch):
         )
 
         self.features = nn.Sequential(
+            # Conv Stem
             nn.Conv2d(
                 in_channels=1,
                 out_channels=16,
@@ -42,39 +42,88 @@ class MalSBSLCNet(MalwareImageBranch):
             nn.BatchNorm2d(16),
             nn.ReLU(inplace=True),
 
+            # Six BaseBlocks from Fig. 4 / Appendix A
             BaseBlock(
-                16,
-                32,
+                in_channels=16,
+                out_channels=32,
                 stride=2,
             ),
-
             BaseBlock(
-                32,
-                32,
+                in_channels=32,
+                out_channels=32,
                 stride=1,
             ),
-
             BaseBlock(
-                32,
-                64,
+                in_channels=32,
+                out_channels=64,
                 stride=2,
             ),
-
             BaseBlock(
-                64,
-                64,
+                in_channels=64,
+                out_channels=64,
                 stride=1,
             ),
-
             BaseBlock(
-                64,
-                128,
+                in_channels=64,
+                out_channels=128,
                 stride=2,
             ),
-
             BaseBlock(
-                128,
-                128,
+                in_channels=128,
+                out_channels=128,
                 stride=1,
             ),
+        )
+
+        # Appendix A:
+        # 128 x 8 x 8 -> 128 x 4 x 4
+        self.pool = nn.AdaptiveAvgPool2d(
+            (4, 4)
+        )
+
+        self.flatten = nn.Flatten()
+
+        # 128 * 4 * 4 = 2048
+        self.embedding_dim = 2048
+
+        self.classifier_bn = nn.BatchNorm1d(
+            self.embedding_dim
+        )
+
+        self.dropout = nn.Dropout(
+            p=0.4
+        )
+
+        self.classifier = nn.Linear(
+            self.embedding_dim,
+            num_classes,
+        )
+
+    def forward_features(
+        self,
+        x: Tensor,
+    ) -> Tensor:
+        return self.features(x)
+
+    def forward(
+        self,
+        x: Tensor,
+    ) -> BranchOutput:
+
+        x = self.features(x)
+
+        x = self.pool(x)
+
+        x = self.flatten(x)
+
+        # Deterministic classifier feature before dropout.
+        embedding = self.classifier_bn(x)
+
+        logits = self.classifier(
+            self.dropout(embedding)
+        )
+
+        return BranchOutput(
+            logits=logits,
+            embedding=embedding,
         )

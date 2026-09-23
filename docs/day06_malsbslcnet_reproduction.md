@@ -2,6 +2,8 @@
 
 Date: 23 September 2026
 
+Updated: 23 September 2026
+
 ## **Purpose**
 
 Analyze and reproduce the architecture of MalSBSLCNet, the lightweight CNN
@@ -96,8 +98,50 @@ follow:
 
 `128 × 8 × 8`
 
-The exact classifier input dimensionality remains dependent on the
-Adaptive Average Pooling configuration specified in the source architecture.
+## **Classifier dimensions verified from Appendix A**
+
+Appendix A resolves the previously uncertain Adaptive Average Pooling
+configuration.
+
+The final BaseBlock produces:
+
+`128 × 8 × 8`
+
+The source classifier then applies Adaptive Average Pooling to produce:
+
+`128 × 4 × 4`
+
+After flattening:
+
+`128 × 4 × 4 = 2048`
+
+features remain.
+
+The classifier therefore follows:
+
+`AdaptiveAvgPool2d((4,4))`
+
+-> `Flatten(2048)`
+
+-> `BatchNorm1d(2048)`
+
+-> `Dropout(0.4)`
+
+-> `Linear`
+
+The source configuration uses nine output classes.
+
+Appendix A reports 18,441 parameters for the source final linear layer,
+which agrees with:
+
+`2048 × 9 + 9 = 18,441`
+
+The present project instead uses the training-derived 51-family class space.
+Therefore, only the output dimension of the final linear classification layer
+is adapted from the source architecture.
+
+This adaptation will change the total project-model parameter count and must
+be reported separately from the source paper's reported complexity.
 
 ## **Stride-1 BaseBlock**
 
@@ -195,33 +239,6 @@ The source text confirms a dropout rate of:
 The use of Adaptive Average Pooling reduces the spatial dimensions before the
 final linear layer and therefore reduces the number of fully connected
 parameters.
-
-## **Current unresolved architecture detail**
-
-Although the overall classifier structure is specified, the exact output
-dimensions of the Adaptive Average Pooling operation were not yet confirmed
-from the material inspected during Day 6.
-
-This value directly determines the flattened embedding dimension.
-
-For example:
-
-`AdaptiveAvgPool2d((1, 1))`
-
-would produce:
-
-`128`
-
-features after flattening.
-
-A different pooling target would produce a different embedding size and
-therefore a different classifier parameter count.
-
-Because the source paper explicitly states that detailed architecture
-information is provided in Appendix A, the final classifier implementation
-was intentionally not fixed until this detail can be verified.
-
-No assumption was silently substituted for the missing source information.
 
 ## **Reported source complexity**
 
@@ -370,10 +387,6 @@ The following components are sufficiently specified by the inspected source:
 - cross-entropy loss;
 - training from scratch.
 
-The final classifier implementation remains pending because the exact
-Adaptive Average Pooling output configuration has not yet been verified from
-Appendix A or clarified by the supervisor.
-
 ## **Measured results**
 
 No MalSBSLCNet training result was produced during Day 6.
@@ -386,20 +399,6 @@ No FLOP count was measured for the project implementation.
 
 Any values such as 0.054M parameters or 9.22M FLOPs in this document refer
 only to values reported by the source paper.
-
-## **Why implementation was paused**
-
-Finalizing the network by guessing the missing pooling or classifier
-dimensions would weaken source compatibility.
-
-The project therefore intentionally pauses the final MalSBSLCNet classifier
-implementation until clarification is available.
-
-This is preferred over silently introducing an unsupported architecture
-choice.
-
-The decision is consistent with the reproducibility requirements in Sections
-4.4 and 15.3 of the project framework.
 
 ## **Current project state**
 
@@ -435,26 +434,18 @@ MalSBSLCNet without inventing undocumented architectural details.
 The feature-extraction backbone and BaseBlock design are now sufficiently
 understood for implementation.
 
-The remaining blocker is the exact classifier dimensionality associated with
-Adaptive Average Pooling.
-
-Rather than fixing that value by assumption, the final implementation is
-deferred until the relevant Appendix A detail or supervisor clarification is
-available.
-
-No model-performance claim is made at this stage.
+Appendix A subsequently resolved the outstanding classifier-dimensionality ambiguity. The complete MalSBSLCNet architecture can therefore now be implemented from the available source specification, with the final output layer adapted from the source nine-class configuration to the project's 51-class known-family space.
 
 ## **Next planned work**
 
 Once the outstanding architecture detail is resolved:
 
-1. finalize `src/models/malsbslcnet.py`;
-2. verify tensor dimensions using synthetic 64 × 64 SBSMI inputs;
-3. measure the actual trainable parameter count;
-4. compare the measured architecture size with the source configuration while
+1. verify tensor dimensions using synthetic 64 × 64 SBSMI inputs;
+2. measure the actual trainable parameter count;
+3. compare the measured architecture size with the source configuration while
    accounting for the 51-class output head;
-5. add the shared PyTorch Lightning training wrapper;
-6. verify Adam and cross-entropy configuration;
-7. retain all temporal split logic outside the model;
-8. proceed toward single-view model training only when the required binary
+4. add the shared PyTorch Lightning training wrapper;
+5. verify Adam and cross-entropy configuration;
+6. retain all temporal split logic outside the model;
+7. proceed toward single-view model training only when the required binary
    data become available.

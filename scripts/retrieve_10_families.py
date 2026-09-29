@@ -330,35 +330,26 @@ print(
     monthly_counts.to_string()
 )
 
-
 # ==================================================
 # 10. Peak month for each family
 # ==================================================
 
-family_monthly = (
-    monthly_counts
-    .drop(columns="TOTAL")
-)
-
+family_monthly = monthly_counts.drop(columns="TOTAL")
 
 print("\n========================================")
 print("PEAK MONTH FOR EACH FAMILY")
 print("========================================")
 
+for family in map(str, family_monthly.columns):
 
-for family in family_monthly.columns:
+    family_counts = family_monthly[family]
 
-    peak_month = (
-        family_monthly[
-            family
-        ].idxmax()
+    peak_month = str(
+        family_counts.idxmax()
     )
 
-    peak_count = (
-        family_monthly.loc[
-            peak_month,
-            family,
-        ]
+    peak_count = int(
+        family_counts.max()
     )
 
     print(
@@ -366,83 +357,6 @@ for family in family_monthly.columns:
         f"{peak_month}: "
         f"{peak_count}"
     )
-
-
-# ==================================================
-# 11. Detect unusually high months
-# ==================================================
-#
-# z-score tells us how far a month's count
-# is from that family's average monthly count.
-#
-# z >= 2 is used here as a simple diagnostic
-# threshold for an unusually high month.
-#
-# This is NOT an exclusion rule.
-# ==================================================
-
-mean_counts = (
-    family_monthly.mean()
-)
-
-std_counts = (
-    family_monthly.std()
-)
-
-
-z_scores = (
-    (family_monthly - mean_counts)
-    / std_counts.replace(
-        0,
-        pd.NA,
-    )
-)
-
-
-print("\n========================================")
-print("UNUSUALLY HIGH FAMILY-MONTH COUNTS")
-print("z-score >= 2")
-print("========================================")
-
-
-outliers_found = False
-
-
-for month in z_scores.index:
-
-    for family in z_scores.columns:
-
-        z_score = z_scores.loc[
-            month,
-            family,
-        ]
-
-        if (
-            pd.notna(z_score)
-            and z_score >= 2
-        ):
-
-            outliers_found = True
-
-            count = family_monthly.loc[
-                month,
-                family,
-            ]
-
-            print(
-                f"{month} | "
-                f"{family:12s} | "
-                f"count={count:4d} | "
-                f"z={z_score:.2f}"
-            )
-
-
-if not outliers_found:
-    print(
-        "No family-month combination "
-        "has z-score >= 2."
-    )
-
 
 # ==================================================
 # 12. Monthly total peaks
@@ -583,15 +497,15 @@ candidate_df["class_id"] = (
 )
 
 
+
 # ==================================================
-# 15. Save audit outputs
+# 15. Save essential audit outputs only
 # ==================================================
 
 MANIFEST_DIR.mkdir(
     parents=True,
     exist_ok=True,
 )
-
 
 manifest_columns = [
     "sha256",
@@ -604,36 +518,27 @@ manifest_columns = [
 ]
 
 
+# 1. Main candidate manifest
 candidate_df[
     manifest_columns
 ].to_csv(
     MANIFEST_DIR
-    / "malcsbsv_candidate_pool_v1.csv",
+    / "malcsbsv_candidate_pool.csv",
     index=False,
 )
 
 
-comparison.to_csv(
-    MANIFEST_DIR
-    / "malcsbsv_paper_count_comparison.csv",
-)
-
-
-yearly_counts.to_csv(
-    MANIFEST_DIR
-    / "malcsbsv_family_counts_by_year.csv",
-)
-
-
+# 2. Monthly family distribution
 monthly_counts.to_csv(
     MANIFEST_DIR
     / "malcsbsv_family_counts_by_month.csv",
 )
 
 
-z_scores.to_csv(
+# 3. Paper vs current BODMAS comparison
+comparison.to_csv(
     MANIFEST_DIR
-    / "malcsbsv_monthly_z_scores.csv",
+    / "malcsbsv_paper_count_comparison.csv",
 )
 
 
@@ -641,7 +546,7 @@ print("\n========================================")
 print("AUDIT COMPLETE")
 print("========================================")
 
-print(
-    "Saved audit files to:",
-    MANIFEST_DIR,
-)
+print("Saved:")
+print("- malcsbsv_candidate_pool_v1.csv")
+print("- malcsbsv_family_counts_by_month.csv")
+print("- malcsbsv_paper_count_comparison.csv")

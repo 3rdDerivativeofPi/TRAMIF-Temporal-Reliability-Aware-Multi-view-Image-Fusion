@@ -528,6 +528,8 @@ candidate_df[
 )
 
 
+
+
 # 2. Monthly family distribution
 monthly_counts.to_csv(
     MANIFEST_DIR

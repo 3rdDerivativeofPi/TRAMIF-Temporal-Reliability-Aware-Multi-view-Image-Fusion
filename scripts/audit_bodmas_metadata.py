@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 
-METADATA_PATH = Path("data/raw/bodmas/bodmas_metadata.csv")
+METADATA_PATH = Path("E://BODMAS_GW//bodmas_metadata.csv")
 
 
 df = pd.read_csv(METADATA_PATH)

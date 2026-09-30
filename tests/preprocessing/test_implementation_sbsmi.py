@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from src.preprocessing.implementation_sbsmi import (
+from preprocessing.implementation_sbsmi import (
     file_to_sbsmi,
     generate_sbsmi_dataset,
     iterate_lbit_states,

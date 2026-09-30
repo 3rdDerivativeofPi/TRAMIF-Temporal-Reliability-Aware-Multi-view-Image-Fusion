@@ -87,3 +87,42 @@ def test_optimizer_is_adam():
         optimizer,
         torch.optim.Adam,
     )
+
+
+def test_training_step_backward():
+    """
+    Verify one forward + backward pass produces gradients.
+
+    This test exercises the full training_step path:
+    model forward -> cross-entropy loss -> backward pass.
+    """
+    torch.manual_seed(42)
+
+    branch = DummyBranch(
+        num_classes=51
+    )
+
+    model = LightningMalwareClassifier(
+        model=branch
+    )
+
+    x = torch.randn(4, 1, 64, 64)
+    y = torch.randint(0, 51, (4,))
+
+    model.train()
+
+    optimizer = model.configure_optimizers()
+
+    loss = model.training_step((x, y), batch_idx=0)
+
+    assert loss.requires_grad is True
+
+    loss.backward()
+
+    # At least one parameter should have a gradient
+    has_grad = any(
+        p.grad is not None and p.grad.abs().sum() > 0
+        for p in model.parameters()
+        if p.requires_grad
+    )
+    assert has_grad, "No parameter received a gradient after backward()"

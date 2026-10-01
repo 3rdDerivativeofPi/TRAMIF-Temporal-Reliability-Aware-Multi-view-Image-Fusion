@@ -7,7 +7,7 @@ from pathlib import Path
 
 import torch
 
-from src.data.reproduction import ReproductionDataset, audit_reproduction_folds
+from src.data.reproduction import make_reproduction_dataset, audit_reproduction_folds
 from src.data.reproduction_datamodule import ReproductionDataModule
 
 
@@ -29,7 +29,7 @@ def main() -> None:
                   scale_to_unit=not args.raw_pixels)
     checked = 0
     if args.check_all_images:
-        dataset = ReproductionDataset(args.manifest, **kwargs)
+        dataset = make_reproduction_dataset(args.manifest, **kwargs)
         for index in range(len(dataset)):
             dataset[index]
             checked += 1

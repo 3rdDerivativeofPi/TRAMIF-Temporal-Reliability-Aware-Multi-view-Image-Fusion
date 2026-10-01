@@ -1,117 +1,161 @@
-"""
-Lazy-loading dataset for malware binary-image classification.
-
-Each sample is identified by a sample_id (typically the SHA-256 hash of
-the original file).  Images are loaded on-demand from disk so that large
-corpora do not need to fit in memory.
-
-The Dataset is agnostic to the image representation (raw-byte, entropy,
-SBSMI, etc.).  Callers specify the image root and a filename suffix so
-that the same interface works for all three views.
-
-Example
--------
->>> import pandas as pd
->>> manifest = pd.DataFrame({
-...     "sample_id": ["abc123", "def456"],
-...     "class_id":  [0, 1],
-... })
->>> dataset = MalwareImageDataset(
-...     manifest=manifest,
-...     image_root=Path("data/images/sbsmi"),
-...     suffix=".png",          # files are {sample_id}.png
-...     transform=None,
-... )
->>> x, y = dataset[0]  # x: Tensor (1, H, W), y: int
-"""
-
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 import pandas as pd
 import torch
+from PIL import Image
 from torch import Tensor
 from torchvision import io
 
 
+def validate_image_file(
+    path: str | Path,
+    expected_size: tuple[int, int] | None = None,
+    strict_grayscale: bool = False,
+) -> None:
+    """Decode an image and optionally check its original mode and size."""
+
+    with Image.open(path) as image:
+        wrong_size = (
+            expected_size is not None
+            and image.size != expected_size
+        )
+        wrong_mode = strict_grayscale and image.mode != "L"
+
+        if wrong_size or wrong_mode:
+            raise ValueError(
+                (
+                    f"Expected {expected_size[0]}x{expected_size[1]} "
+                    if expected_size is not None
+                    else "Expected "
+                )
+                + ("mode L image" if strict_grayscale else "image")
+                + f", got {image.size} {image.mode}: {path}"
+            )
+
+        image.load()
+
+
+@dataclass(frozen=True)
+class ImageToFloat:
+    """Picklable transform for Windows DataLoader workers."""
+
+    scale_to_unit: bool = True
+
+    def __call__(self, image: Tensor) -> Tensor:
+        image = image.to(torch.float32)
+
+        if self.scale_to_unit:
+            return image / 255.0
+
+        return image
+
+
 class MalwareImageDataset(torch.utils.data.Dataset):
-    """
-    Lazy-loading dataset for disk-stored malware binary images.
+    """Shared image loader for SBSMI, raw-byte, and entropy images."""
 
-    Parameters
-    ----------
-    manifest : pd.DataFrame
-        Must contain at least the columns:
-
-        - ``sample_id`` — unique identifier for each sample (e.g. SHA-256).
-        - ``class_id`` — integer class label in range ``[0, num_classes)``.
-
-        Extra columns are ignored.
-    image_root : Path | str
-        Root directory containing one image file per sample.
-    suffix : str
-        Filename suffix appended to each ``sample_id`` to locate the image
-        on disk, e.g. ``".npy"`` or ``".png"``.
-    transform : callable | None
-        Optional transform applied to the image tensor after loading.
-        Must return a ``torch.Tensor``.  If ``None`` the raw loaded tensor
-        is returned.
-
-    Raises
-    ------
-    FileNotFoundError
-        If an image file does not exist at the expected path.
-    ValueError
-        If the manifest is missing required columns or ``sample_id`` values
-        are not unique.
-    """
-
-    _REQUIRED_COLUMNS = frozenset({"sample_id", "class_id"})
+    _REQUIRED_COLUMNS = frozenset({
+        "sample_id",
+        "class_id",
+    })
 
     def __init__(
         self,
         manifest: pd.DataFrame,
         image_root: Path | str,
         suffix: str = "",
-        transform: callable | None = None,
+        transform: Callable[[Tensor], Tensor] | None = None,
+        *,
+        image_column: str | None = None,
+        expected_size: tuple[int, int] | None = None,
+        strict_grayscale: bool = False,
+        sort_by_sample_id: bool = True,
     ) -> None:
         super().__init__()
 
         self.image_root = Path(image_root)
         self.suffix = suffix
         self.transform = transform
+        self.image_column = image_column
+        self.expected_size = expected_size
+        self.strict_grayscale = strict_grayscale
 
-        # Validate columns
         missing = self._REQUIRED_COLUMNS - set(manifest.columns)
+
         if missing:
             raise ValueError(
                 f"Manifest is missing required columns: {sorted(missing)}"
             )
 
-        # Validate unique sample IDs
         if manifest["sample_id"].duplicated().any():
             raise ValueError("sample_id values must be unique")
 
-        # Store a sorted copy so that __getitem__ order is deterministic
-        self._manifest = (
-            manifest[["sample_id", "class_id"]]
-            .sort_values("sample_id")
-            .reset_index(drop=True)
-        )
+        if (
+            manifest["sample_id"].isna().any()
+            or manifest["sample_id"]
+            .astype(str)
+            .str.strip()
+            .eq("")
+            .any()
+        ):
+            raise ValueError("sample_id values must be non-empty")
+
+        if image_column is not None:
+            if image_column not in manifest:
+                raise ValueError(
+                    f"Missing image column: {image_column}"
+                )
+
+            if (
+                manifest[image_column].isna().any()
+                or manifest[image_column]
+                .astype(str)
+                .str.strip()
+                .eq("")
+                .any()
+            ):
+                raise ValueError(
+                    f"{image_column} contains an empty path"
+                )
+
+        self._manifest = manifest.copy()
+
+        if sort_by_sample_id:
+            self._manifest = self._manifest.sort_values(
+                "sample_id",
+                kind="mergesort",
+            )
+
+        self._manifest = self._manifest.reset_index(drop=True)
 
     def __len__(self) -> int:
         return len(self._manifest)
 
     def __getitem__(self, index: int) -> tuple[Tensor, int]:
-        sample_id = self._manifest.loc[index, "sample_id"]
-        class_id: int = int(self._manifest.loc[index, "class_id"])
+        row = self._manifest.iloc[index]
+        class_id = int(row["class_id"])
 
-        image_path = self.image_root / f"{sample_id}{self.suffix}"
+        if self.image_column is None:
+            image_path = (
+                self.image_root
+                / f"{row['sample_id']}{self.suffix}"
+            )
+        else:
+            image_path = Path(str(row[self.image_column]))
 
-        # Read image as grayscale (1 channel).  torchvision.io.read_image
-        # returns uint8 Tensor with shape (C, H, W).  We force C=1 by
-        # converting from RGB if needed.
+            if not image_path.is_absolute():
+                image_path = self.image_root / image_path
+
+        if self.expected_size is not None or self.strict_grayscale:
+            validate_image_file(
+                image_path,
+                self.expected_size,
+                self.strict_grayscale,
+            )
+
         image = io.read_image(
             str(image_path),
             mode=io.ImageReadMode.GRAY,

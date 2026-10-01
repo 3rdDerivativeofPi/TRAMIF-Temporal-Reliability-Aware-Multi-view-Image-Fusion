@@ -8,6 +8,8 @@ from torch import nn
 from torchmetrics.classification import (
     MulticlassAccuracy,
     MulticlassF1Score,
+    MulticlassPrecision,
+    MulticlassRecall,
 )
 
 from src.models.branch import (
@@ -34,11 +36,13 @@ class LightningMalwareClassifier(L.LightningModule):
         self,
         model: MalwareImageBranch,
         learning_rate: float = 1e-3,
+        weight_decay: float = 0.0,
     ) -> None:
         super().__init__()
 
         self.model = model
         self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
 
         self.criterion = nn.CrossEntropyLoss()
 
@@ -55,6 +59,29 @@ class LightningMalwareClassifier(L.LightningModule):
         self.val_macro_f1 = MulticlassF1Score(
             num_classes=num_classes,
             average="macro",
+        )
+
+        self.test_accuracy = MulticlassAccuracy(
+            num_classes=num_classes,
+            average="micro",
+        )
+
+        self.test_macro_precision = MulticlassPrecision(
+            num_classes=num_classes,
+            average="macro",
+            zero_division=0,
+        )
+
+        self.test_macro_recall = MulticlassRecall(
+            num_classes=num_classes,
+            average="macro",
+            zero_division=0,
+        )
+
+        self.test_macro_f1 = MulticlassF1Score(
+            num_classes=num_classes,
+            average="macro",
+            zero_division=0,
         )
 
         self.save_hyperparameters(
@@ -160,11 +187,44 @@ class LightningMalwareClassifier(L.LightningModule):
             prog_bar=True,
         )
 
-    def configure_optimizers(
+    def test_step(
         self,
-    ) -> torch.optim.Optimizer:
+        batch: tuple[Tensor, Tensor],
+        batch_idx: int,
+    ) -> None:
+        x, y = batch
 
+        output = self.model(x)
+
+        loss = self.criterion(output.logits, y)
+        predictions = output.logits.argmax(dim=1)
+
+        self.log(
+            "test_loss",
+            loss,
+            on_step=False,
+            on_epoch=True,
+            batch_size=y.numel(),
+        )
+
+        for name, metric in (
+            ("test_accuracy", self.test_accuracy),
+            ("test_macro_precision", self.test_macro_precision),
+            ("test_macro_recall", self.test_macro_recall),
+            ("test_macro_f1", self.test_macro_f1),
+        ):
+            metric.update(predictions, y)
+
+            self.log(
+                name,
+                metric,
+                on_step=False,
+                on_epoch=True,
+            )
+
+    def configure_optimizers(self) -> torch.optim.Optimizer:
         return torch.optim.Adam(
             self.parameters(),
             lr=self.learning_rate,
+            weight_decay=self.weight_decay,
         )

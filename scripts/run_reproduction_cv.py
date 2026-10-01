@@ -17,12 +17,28 @@ def main() -> None:
     parser.add_argument("--image-root", type=Path, default=Path("."))
     parser.add_argument("--image-column", default="image_path")
     parser.add_argument("--model-factory", required=True, help="module:function accepting num_classes=...")
-    parser.add_argument("--epochs", type=int, required=True, help="Predeclared fixed epoch budget; never tune on outer test")
+
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=100,
+        help="Predeclared training budget; never tune on outer test.",
+    )
+    
     parser.add_argument("--n-splits", type=int, default=10)
-    parser.add_argument("--batch-size", type=int, default=64)
+
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=32,
+    )
+
     parser.add_argument("--num-workers", type=int, default=0)
+
     parser.add_argument("--seed", type=int, default=42)
+
     parser.add_argument("--accelerator", choices=["auto", "cpu", "gpu"], default="auto")
+    
     parser.add_argument("--raw-pixels", action="store_true")
     parser.add_argument("--output-dir", type=Path, default=Path("reports/reproduction_cv"))
     args = parser.parse_args()

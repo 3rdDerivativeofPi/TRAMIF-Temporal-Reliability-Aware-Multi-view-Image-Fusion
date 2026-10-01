@@ -10,7 +10,7 @@ import torch
 from PIL import Image
 
 from src.data.cross_validation import build_stratified_fold_manifest
-from src.data.reproduction import ReproductionDataset, audit_reproduction_folds
+from src.data.reproduction import make_reproduction_dataset, audit_reproduction_folds
 from src.data.reproduction_datamodule import ReproductionDataModule
 
 
@@ -32,15 +32,15 @@ def samples(tmp_path):
 
 def test_tensor_contract_and_exact_pixel_scaling(samples):
     frame, root = samples
-    dataset = ReproductionDataset(frame, image_root=root)
+    dataset = make_reproduction_dataset(frame, image_root=root)
     x, y = dataset[0]
     assert x.shape == (1, 64, 64) and x.dtype == torch.float32
     assert isinstance(y, int) and y == int(frame.iloc[0].class_id)
     assert x[0, 0, 0] == 0 and x[0, -1, -1] == 1
-    raw, _ = ReproductionDataset(frame, image_root=root, scale_to_unit=False)[0]
+    raw, _ = make_reproduction_dataset(frame, image_root=root, scale_to_unit=False)[0]
     torch.testing.assert_close(x, raw / 255)
     # A subset lacking class 0 must keep class 1, not remap it to 0.
-    assert ReproductionDataset(frame[frame.class_id == 1], image_root=root)[0][1] == 1
+    assert make_reproduction_dataset(frame[frame.class_id == 1], image_root=root)[0][1] == 1
 
 
 @pytest.mark.parametrize("mode,size", [("RGB", (64, 64)), ("L", (32, 64))])
@@ -48,7 +48,7 @@ def test_wrong_preprocessing_is_rejected(samples, mode, size):
     frame, root = samples
     Image.new(mode, size).save(root / frame.iloc[0].image_path)
     with pytest.raises(ValueError, match="Expected 64x64"):
-        ReproductionDataset(frame, image_root=root)[0]
+        make_reproduction_dataset(frame, image_root=root)[0]
 
 
 def test_every_fold_has_exact_complement_and_all_samples_once(samples):
@@ -102,7 +102,7 @@ def test_missing_file_and_corrupted_image_fail(samples):
         audit_reproduction_folds(frame, n_splits=3, image_root=root)
     path.write_bytes(b"invalid PNG")
     with pytest.raises(OSError):
-        ReproductionDataset(frame, image_root=root)[0]
+        make_reproduction_dataset(frame, image_root=root)[0]
 
 
 def test_unbalanced_folds_and_inconsistent_labels_rejected(samples):

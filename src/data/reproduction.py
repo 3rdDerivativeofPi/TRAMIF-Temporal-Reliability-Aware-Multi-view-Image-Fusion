@@ -5,9 +5,14 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import torch
-from PIL import Image
-from torch.utils.data import Dataset
+
+from src.data.datasets import (
+    ImageToFloat,
+    MalwareImageDataset,
+)
+from src.data.labels import (
+    family_label_space_from_frame,
+)
 
 from src.data.cross_validation import split_fold_manifest, validate_fold_manifest
 
@@ -76,6 +81,9 @@ def audit_reproduction_folds(source: str | Path | pd.DataFrame, *,
         if (frame.groupby("family")["class_id"].nunique().max() != 1
                 or frame.groupby("class_id")["family"].nunique().max() != 1):
             raise ValueError("family and class_id must have a one-to-one mapping")
+        family_label_space_from_frame(
+            frame[["family", "class_id"]].drop_duplicates()
+        )
     paths = None
     if image_root is not None:
         paths = resolve_image_paths(frame, image_root, image_column)
@@ -108,33 +116,51 @@ def audit_reproduction_folds(source: str | Path | pd.DataFrame, *,
             "folds": folds}
 
 
-class ReproductionDataset(Dataset):
-    """Read existing 64x64 grayscale images as float32 [1,64,64], Python int.
+def make_reproduction_dataset(
+    manifest: str | Path | pd.DataFrame,
+    *,
+    image_root: str | Path = ".",
+    image_column: str = "image_path",
+    scale_to_unit: bool = True,
+) -> MalwareImageDataset:
+    """Adapt reproduction metadata to the shared image loader."""
 
-    Default scaling is uint8 / 255 -> [0,1]. Set scale_to_unit=False for
-    float32 [0,255]. No resize, augmentation, RGB conversion, label remapping,
-    or learned normalization is applied. Preprocessing errors fail explicitly.
-    """
-    def __init__(self, manifest: str | Path | pd.DataFrame, *,
-                 image_root: str | Path = ".", image_column: str = "image_path",
-                 scale_to_unit: bool = True):
-        frame = read_manifest(manifest)
-        if frame.empty:
-            raise ValueError("Dataset manifest must not be empty")
-        self.labels = integer_column(frame, "class_id").tolist()
-        self.paths = resolve_image_paths(frame, image_root, image_column)
-        self.scale_to_unit = scale_to_unit
+    frame = read_manifest(manifest)
 
-    def __len__(self) -> int:
-        return len(self.paths)
+    if frame.empty:
+        raise ValueError("Dataset manifest must not be empty")
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, int]:
-        path = self.paths[index]
-        with Image.open(path) as image:
-            if image.mode != "L" or image.size != (64, 64):
-                raise ValueError(f"Expected 64x64 mode L image, got {image.size} {image.mode}: {path}")
-            array = np.array(image, dtype=np.uint8, copy=True)
-        tensor = torch.from_numpy(array).unsqueeze(0).to(torch.float32)
-        if self.scale_to_unit:
-            tensor.div_(255.0)
-        return tensor, int(self.labels[index])
+    if "sha" not in frame:
+        raise ValueError("Missing required column: sha")
+
+    if (
+        "sample_id" in frame
+        and not frame["sample_id"]
+        .astype(str)
+        .equals(frame["sha"].astype(str))
+    ):
+        raise ValueError(
+            "sample_id and sha must identify the same samples"
+        )
+
+    frame["sample_id"] = frame["sha"]
+    frame["class_id"] = integer_column(frame, "class_id")
+
+    frame[image_column] = [
+        str(path)
+        for path in resolve_image_paths(
+            frame,
+            image_root,
+            image_column,
+        )
+    ]
+
+    return MalwareImageDataset(
+        frame,
+        image_root=image_root,
+        image_column=image_column,
+        transform=ImageToFloat(scale_to_unit),
+        expected_size=(64, 64),
+        strict_grayscale=True,
+        sort_by_sample_id=False,
+    )

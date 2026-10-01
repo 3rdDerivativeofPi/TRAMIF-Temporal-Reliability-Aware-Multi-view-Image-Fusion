@@ -11,7 +11,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from src.data.cross_validation import split_fold_manifest
-from src.data.reproduction import (ReproductionDataset, audit_reproduction_folds,
+from src.data.reproduction import (make_reproduction_dataset, audit_reproduction_folds,
                                    integer_column, read_manifest)
 
 
@@ -54,8 +54,8 @@ class ReproductionDataModule(pl.LightningDataModule):
         self.train_manifest, self.test_manifest = split_fold_manifest(frame, self.fold_id)
         kwargs = dict(image_root=self.image_root, image_column=self.image_column,
                       scale_to_unit=self.scale_to_unit)
-        self.train_dataset = ReproductionDataset(self.train_manifest, **kwargs)
-        self.test_dataset = ReproductionDataset(self.test_manifest, **kwargs)
+        self.train_dataset = make_reproduction_dataset(self.train_manifest, **kwargs)
+        self.test_dataset = make_reproduction_dataset(self.test_manifest, **kwargs)
 
     @property
     def num_classes(self) -> int:

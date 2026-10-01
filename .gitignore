@@ -229,6 +229,7 @@ data/cache/
 # Large sample-level derived manifests
 data/manifests/bodmas_all_v0.csv
 data/manifests/bodmas_family_v0.csv
+data/manifests/test
 
 # Model outputs
 checkpoints/
@@ -238,4 +239,3 @@ checkpoints/
 
 # Generated results
 results/
-

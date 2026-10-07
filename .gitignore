@@ -237,5 +237,5 @@ checkpoints/
 *.pth
 *.ckpt
 
-# Generated results
-results/
+# training logs
+runs/

@@ -230,6 +230,7 @@ data/cache/
 data/manifests/bodmas_all_v0.csv
 data/manifests/bodmas_family_v0.csv
 data/manifests/test
+data/manifests/sbsmi_full
 
 # Model outputs
 checkpoints/

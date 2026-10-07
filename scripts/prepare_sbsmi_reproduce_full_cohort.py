@@ -18,6 +18,9 @@ from src.data.reproduction import audit_reproduction_folds, integer_column
 from src.preprocessing.implementation_sbsmi import generate_sbsmi_dataset
 
 
+# training command: python -m scripts.prepare_sbsmi_reproduce_full_cohort --source "data\raw\BODMAS_GW\altered"
+# for duong: python -m scripts.prepare_sbsmi_reproduce_full_cohort --source "E:\BODMAS_GW\BODMAS_disarmed_malware_binaries.zip"
+
 FAMILIES = {
     "ceeinject", "drolnux", "gandcrab", "mira", "musecador",
     "sfone", "sillyp2p", "small", "upatre", "wabot",

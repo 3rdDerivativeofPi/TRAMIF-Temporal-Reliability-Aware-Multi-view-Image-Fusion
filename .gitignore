@@ -225,6 +225,8 @@ data/raw/
 data/processed/
 data/images/
 data/cache/
+data/derived/
+
 
 # Large sample-level derived manifests
 data/manifests/bodmas_all_v0.csv
@@ -240,3 +242,9 @@ checkpoints/
 
 # Generated results
 results/
+
+# ignore the archived zip files
+ignore/
+
+# ignore the reports for testing
+reports/

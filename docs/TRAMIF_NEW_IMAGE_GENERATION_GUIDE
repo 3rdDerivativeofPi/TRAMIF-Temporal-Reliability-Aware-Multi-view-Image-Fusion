@@ -1,0 +1,271 @@
+Yep. Here are the **actual commands** you can use for the **distributed V2 pipeline**.
+
+I’ll give you:
+
+1. **Build manifest once**
+2. **Generate Raw-byte only**
+3. **Generate Entropy only**
+4. **Generate SBSMI only**
+5. **Generate all 3 modalities on one machine**
+6. **Train + validation only**
+7. **Future test only**
+8. **Everything (train + validation + test, all modalities)**
+9. **Recommended order**
+
+---
+
+# 0. First: build the shared manifest once
+
+Run this **one time only** before generation.
+
+```powershell
+python -m scripts.build_temporal_manifest `
+  --metadata "E:\BODMAS_GW\bodmas_metadata.csv" `
+  --mapping "data\manifests\bodmas_eligible_families_v0.csv" `
+  --output "data\manifests\multiview_v2_manifest.csv"
+```
+
+This creates the canonical manifest that all laptops should use.
+
+---
+
+# 1. Raw-byte only
+
+## Train + Validation
+```powershell
+python -m scripts.generate_multiview_dataset_v2 `
+  --source "E:\BODMAS_GW\BODMAS_disarmed_malware_binaries.zip" `
+  --output-dir "E:\TRAMIF_jobs\raw_byte" `
+  --modalities raw_byte `
+  --splits train validation `
+  --worker-id laptop-raw
+```
+
+## Future Test
+```powershell
+python -m scripts.generate_multiview_dataset_v2 `
+  --source "E:\BODMAS_GW\BODMAS_disarmed_malware_binaries.zip" `
+  --output-dir "E:\TRAMIF_jobs\raw_byte" `
+  --modalities raw_byte `
+  --splits test `
+  --worker-id laptop-raw
+```
+
+---
+
+# 2. Entropy only
+
+## Train + Validation
+```powershell
+python -m scripts.generate_multiview_dataset_v2 `
+  --source "E:\BODMAS_GW\BODMAS_disarmed_malware_binaries.zip" `
+  --output-dir "E:\TRAMIF_jobs\entropy" `
+  --modalities entropy `
+  --splits train validation `
+  --worker-id laptop-entropy
+```
+
+## Future Test
+```powershell
+python -m scripts.generate_multiview_dataset_v2 `
+  --source "E:\BODMAS_GW\BODMAS_disarmed_malware_binaries.zip" `
+  --output-dir "E:\TRAMIF_jobs\entropy" `
+  --modalities entropy `
+  --splits test `
+  --worker-id laptop-entropy
+```
+
+---
+
+# 3. SBSMI only
+
+## Train + Validation
+```powershell
+python -m scripts.generate_multiview_dataset_v2 `
+  --source "E:\BODMAS_GW\BODMAS_disarmed_malware_binaries.zip" `
+  --output-dir "E:\TRAMIF_jobs\sbsmi" `
+  --modalities sbsmi `
+  --splits train validation `
+  --worker-id laptop-sbsmi
+```
+
+## Future Test
+```powershell
+python -m scripts.generate_multiview_dataset_v2 `
+  --source "E:\BODMAS_GW\BODMAS_disarmed_malware_binaries.zip" `
+  --output-dir "E:\TRAMIF_jobs\sbsmi" `
+  --modalities sbsmi `
+  --splits test `
+  --worker-id laptop-sbsmi
+```
+
+---
+
+# 4. EVERYTHING on one machine (all 3 modalities)
+
+## Train + Validation
+```powershell
+python -m scripts.generate_multiview_dataset_v2 `
+  --source "E:\BODMAS_GW\BODMAS_disarmed_malware_binaries.zip" `
+  --output-dir "E:\TRAMIF_jobs\all_modalities" `
+  --modalities all `
+  --splits train validation `
+  --worker-id laptop-all
+```
+
+## Future Test
+```powershell
+python -m scripts.generate_multiview_dataset_v2 `
+  --source "E:\BODMAS_GW\BODMAS_disarmed_malware_binaries.zip" `
+  --output-dir "E:\TRAMIF_jobs\all_modalities" `
+  --modalities all `
+  --splits test `
+  --worker-id laptop-all
+```
+
+---
+
+# 5. EVERYTHING in one command (train + validation + test)
+
+If you want the full full full run:
+
+```powershell
+python -m scripts.generate_multiview_dataset_v2 `
+  --source "E:\BODMAS_GW\BODMAS_disarmed_malware_binaries.zip" `
+  --output-dir "E:\TRAMIF_jobs\all_modalities" `
+  --modalities all `
+  --splits train validation test `
+  --worker-id laptop-all
+```
+
+That is the **everything version**.
+
+---
+
+# 6. If 3 laptops divide the work
+
+## Laptop A — Raw-byte
+```powershell
+python -m scripts.generate_multiview_dataset_v2 `
+  --source "E:\BODMAS_GW\BODMAS_disarmed_malware_binaries.zip" `
+  --output-dir "E:\TRAMIF_jobs\raw_byte" `
+  --modalities raw_byte `
+  --splits train validation test `
+  --worker-id laptop-A
+```
+
+## Laptop B — Entropy
+```powershell
+python -m scripts.generate_multiview_dataset_v2 `
+  --source "E:\BODMAS_GW\BODMAS_disarmed_malware_binaries.zip" `
+  --output-dir "E:\TRAMIF_jobs\entropy" `
+  --modalities entropy `
+  --splits train validation test `
+  --worker-id laptop-B
+```
+
+## Laptop C — SBSMI
+```powershell
+python -m scripts.generate_multiview_dataset_v2 `
+  --source "E:\BODMAS_GW\BODMAS_disarmed_malware_binaries.zip" `
+  --output-dir "E:\TRAMIF_jobs\sbsmi" `
+  --modalities sbsmi `
+  --splits train validation test `
+  --worker-id laptop-C
+```
+
+This is probably your best setup.
+
+---
+
+# 7. If you want a quick smoke test first
+
+Before full run, do a 10-sample test:
+
+```powershell
+python -m scripts.generate_multiview_dataset_v2 `
+  --source "E:\BODMAS_GW\BODMAS_disarmed_malware_binaries.zip" `
+  --output-dir "E:\TRAMIF_jobs\smoke_test" `
+  --modalities all `
+  --splits train validation `
+  --worker-id smoke-test `
+  --limit 10
+```
+
+Then remove `--limit 10` for the full run.
+
+---
+
+# 8. After generation: merge outputs from 3 laptops
+
+If you generated modalities separately, merge them after collecting all three folders:
+
+```powershell
+python -m scripts.merge_multiview_dataset `
+  --inputs "E:\TRAMIF_jobs\raw_byte" "E:\TRAMIF_jobs\entropy" "E:\TRAMIF_jobs\sbsmi" `
+  --output-dir "E:\TRAMIF_jobs\merged" `
+  --splits train validation test
+```
+
+If you want to dry-run first:
+
+```powershell
+python -m scripts.merge_multiview_dataset `
+  --inputs "E:\TRAMIF_jobs\raw_byte" "E:\TRAMIF_jobs\entropy" "E:\TRAMIF_jobs\sbsmi" `
+  --output-dir "E:\TRAMIF_jobs\merged" `
+  --splits train validation test `
+  --dry-run
+```
+
+---
+
+# 9. After merging: audit the dataset
+
+```powershell
+python -m scripts.audit_multiview_dataset `
+  --dataset-dir "E:\TRAMIF_jobs\merged"
+```
+
+If your audit script expects split arguments too, use:
+
+```powershell
+python -m scripts.audit_multiview_dataset `
+  --dataset-dir "E:\TRAMIF_jobs\merged" `
+  --splits train validation test
+```
+
+---
+
+# 10. My recommended order for you
+
+## Best practical workflow
+1. Build manifest once
+2. Run **10-sample smoke test**
+3. Run full generation on 3 laptops:
+   - laptop A = raw_byte
+   - laptop B = entropy
+   - laptop C = sbsmi
+4. Merge outputs
+5. Audit outputs
+
+---
+
+# 11. Important note about test split
+
+You **can generate** the `test` images now, because preprocessing is fixed.
+
+But per protocol:
+
+- do **not** use Apr–Sep 2020 to tune model architecture,
+- do **not** use it to fit temperature scaling,
+- do **not** use it to choose reliability coefficients,
+- do **not** use it to choose checkpoints.
+
+Generating the images is okay; **using the future test for tuning is not**.
+
+---
+
+If you want, next I can give you:
+
+1. a **single copy-paste block per laptop**, or  
+2. a **`.bat` / PowerShell script file** for each member so they can just double-click run.

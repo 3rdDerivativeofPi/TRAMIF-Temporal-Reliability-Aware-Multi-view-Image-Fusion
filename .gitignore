@@ -248,3 +248,6 @@ ignore/
 
 # ignore the reports for testing
 reports/
+
+# training logs
+runs/

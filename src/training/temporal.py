@@ -145,7 +145,7 @@ def seed_all(seed: int, deterministic: bool) -> None:
         os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
     torch.backends.cudnn.benchmark = not deterministic
     torch.backends.cudnn.deterministic = deterministic
-    torch.use_deterministic_algorithms(deterministic)
+    torch.use_deterministic_algorithms(deterministic, warn_only=True)
 
 
 def _rng_state() -> dict:

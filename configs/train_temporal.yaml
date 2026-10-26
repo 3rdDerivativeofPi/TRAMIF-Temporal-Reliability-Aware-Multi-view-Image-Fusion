@@ -1,0 +1,29 @@
+# Paths are relative to the repository root when called from there.
+dataset:
+  root: data/processed/TRAMIF-dataset/all_modalities
+  manifest: data/manifests/multiview_v2_manifest.csv
+  mapping: data/manifests/bodmas_eligible_families_v0.csv
+
+# MalSBSLCNet is the currently implemented branch in this repository.
+# Replace an individual class_path only when that view's CNN has been implemented.
+models:
+  raw_byte:
+    class_path: src.models.malsbslcnet:MalSBSLCNet
+    kwargs: {}
+  entropy:
+    class_path: src.models.malsbslcnet:MalSBSLCNet
+    kwargs: {}
+  sbsmi:
+    class_path: src.models.malsbslcnet:MalSBSLCNet
+    kwargs: {}
+
+training:
+  epochs: 40                 # Maximum pilot epochs; final duration comes from epoch plan
+  batch_size: 32
+  num_workers: 4             # Benchmark 2/4 workers later when using real images
+  learning_rate: 0.0001
+  weight_decay: 0.000001
+  grad_accumulation: 1
+  grad_clip: 1.0
+  amp: true
+  deterministic: true
